@@ -32,11 +32,45 @@ repos:
         language: system
         types: [yaml]
 
+      - id: check-github-issue-forms
+        name: Validate GitHub issue forms
+        entry: >-
+          check-jsonschema --builtin-schema vendor.github-issue-forms
+        language: system
+        types: [yaml]
+        files: >-
+          ^\.github/ISSUE_TEMPLATE/(?!config\.ya?ml$)[^/]+\.ya?ml$
+
+      - id: check-github-issue-config
+        name: Validate GitHub issue configuration
+        entry: >-
+          check-jsonschema --builtin-schema vendor.github-issue-config
+        language: system
+        types: [yaml]
+        files: ^\.github/ISSUE_TEMPLATE/config\.ya?ml$
+
+      - id: check-compose
+        name: Validate Compose configuration
+        entry: check-jsonschema --builtin-schema vendor.compose-spec
+        language: system
+        types: [yaml]
+        files: >-
+          (?:^|/)(?:compose|docker-compose|podman-compose)\.ya?ml$
+
       - id: check-json
         name: Validate JSON with jq
         entry: jq empty
         language: system
         types: [json]
+
+      - id: trivy-config
+        name: Trivy Terraform configuration scan
+        entry: >-
+          trivy config --skip-check-update --skip-version-check
+          --disable-telemetry --exit-code 1 --severity HIGH,CRITICAL .
+        language: system
+        files: \.tf(?:vars)?(?:\.json)?$
+        pass_filenames: false
 
       - id: gitleaks
         name: Gitleaks
