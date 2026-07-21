@@ -1,0 +1,82 @@
+---
+name: Terraform
+
+'on':
+  pull_request:
+    paths:
+      - '**/*.tf'
+      - '**/*.tf.json'
+      - '**/*.tfvars'
+      - '**/*.tfvars.json'
+      - '.github/workflows/terraform.yml'
+  push:
+    branches: [main]
+    paths:
+      - '**/*.tf'
+      - '**/*.tf.json'
+      - '**/*.tfvars'
+      - '**/*.tfvars.json'
+      - '.github/workflows/terraform.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Terraform
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd  # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd  # v3
+        with:
+          terraform_version: 1.15.8
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@c750028ac0f3831886a261f96da68ab58a92e7ec  # v6
+        with:
+          tflint_version: v0.63.1
+
+      - name: Set up Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567  # v0.3.1
+        with:
+          version: v0.72.0
+
+      - name: Install terraform-docs
+        run: |
+          mkdir -p "${RUNNER_TEMP}/terraform-bin"
+          GOBIN="${RUNNER_TEMP}/terraform-bin" \
+            go install github.com/terraform-docs/terraform-docs@v0.24.0
+          echo "${RUNNER_TEMP}/terraform-bin" >> "${GITHUB_PATH}"
+
+      - name: Check Terraform formatting
+        run: terraform fmt -check -recursive
+
+      - name: Initialize Terraform without a backend
+        run: terraform init -backend=false
+
+      - name: Validate Terraform
+        run: terraform validate
+
+      - name: Run TFLint
+        run: |
+          tflint --init
+          tflint --recursive --minimum-failure-severity=error
+
+      - name: Validate terraform-docs input
+        run: terraform-docs markdown table . > "${RUNNER_TEMP}/terraform-docs.md"
+
+      - name: Scan Terraform configuration
+        run: |
+          trivy config \
+            --skip-check-update \
+            --skip-version-check \
+            --disable-telemetry \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            .
